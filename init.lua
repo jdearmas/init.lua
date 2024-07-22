@@ -522,6 +522,7 @@ vim.opt.shiftwidth = 2
 vim.opt.expandtab = true
 vim.opt.softtabstop = 2
 vim.opt.autoindent = true
+vim.opt.autochdir = true
 
 -- Enable true color
 vim.o.termguicolors = true

@@ -2,9 +2,9 @@
 -- 
 -- This is a Lua program that is executed when Neovim starts.
 --
--- This configures Neovim, set keybindings, and define commands, among other things.
+-- This configures Neovim, downloads plugins, sets keybindings, and defines commands, among other things.
 --
--- This is the only file that is required to be in Lua.
+-- This is the only file that is required.
 --
 --]]
 
@@ -51,12 +51,134 @@ vim.api.nvim_set_keymap("n", "<leader>o", ":lua pipe_messages_to_buffer()<CR>", 
 
 -- A modern plugin manager for Neovim.
 require("lazy").setup({
+  {
+    'yacineMTB/dingllm.nvim',
+    dependencies = { 'nvim-lua/plenary.nvim' },
+    config = function()
+      local system_prompt =
+        'You should replace the code that you are sent, only following the comments. Do not talk at all. Only output valid code. Do not provide any backticks that surround the code. Never ever output backticks like this ```. Any comment that is asking you for something should be removed after you satisfy them. Other comments should left alone. Do not output backticks'
+      local helpful_prompt = 'You are a helpful assistant. What I have sent are my notes so far.'
+      local dingllm = require 'dingllm'
+
+
+      local function handle_open_router_spec_data(data_stream)
+        local success, json = pcall(vim.json.decode, data_stream)
+        if success then
+          if json.choices and json.choices[1] and json.choices[1].text then
+            local content = json.choices[1].text
+            if content then
+              dingllm.write_string_at_cursor(content)
+            end
+          end
+        else
+          print("non json " .. data_stream)
+        end
+      end
+
+      local function custom_make_openai_spec_curl_args(opts, prompt)
+        local url = opts.url
+        local api_key = opts.api_key_name and os.getenv(opts.api_key_name)
+        local data = {
+          prompt = prompt,
+          model = opts.model,
+          temperature = 0.7,
+          stream = true,
+        }
+        local args = { '-N', '-X', 'POST', '-H', 'Content-Type: application/json', '-d', vim.json.encode(data) }
+        if api_key then
+          table.insert(args, '-H')
+          table.insert(args, 'Authorization: Bearer ' .. api_key)
+        end
+        table.insert(args, url)
+        return args
+      end
+
+
+      local function llama_405b_base()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://openrouter.ai/api/v1/chat/completions',
+          model = 'meta-llama/llama-3.1-405b',
+          api_key_name = 'OPEN_ROUTER_API_KEY',
+          max_tokens = '128',
+          replace = false,
+        }, custom_make_openai_spec_curl_args, handle_open_router_spec_data)
+      end
+
+      local function groq_replace()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.groq.com/openai/v1/chat/completions',
+          model = 'llama-3.1-70b-versatile',
+          api_key_name = 'GROQ_API_KEY',
+          system_prompt = system_prompt,
+          replace = true,
+        }, dingllm.make_openai_spec_curl_args, dingllm.handle_openai_spec_data)
+      end
+
+      local function groq_help()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.groq.com/openai/v1/chat/completions',
+          model = 'llama-3.1-70b-versatile',
+          api_key_name = 'GROQ_API_KEY',
+          system_prompt = helpful_prompt,
+          replace = false,
+        }, dingllm.make_openai_spec_curl_args, dingllm.handle_openai_spec_data)
+      end
+
+      local function llama405b_replace()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.lambdalabs.com/v1/chat/completions',
+          model = 'hermes-3-llama-3.1-405b-fp8',
+          api_key_name = 'LAMBDA_API_KEY',
+          system_prompt = system_prompt,
+          replace = true,
+        }, dingllm.make_openai_spec_curl_args, dingllm.handle_openai_spec_data)
+      end
+
+      local function llama405b_help()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.lambdalabs.com/v1/chat/completions',
+          model = 'hermes-3-llama-3.1-405b-fp8',
+          api_key_name = 'LAMBDA_API_KEY',
+          system_prompt = helpful_prompt,
+          replace = false,
+        }, dingllm.make_openai_spec_curl_args, dingllm.handle_openai_spec_data)
+      end
+
+      local function anthropic_help()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.anthropic.com/v1/messages',
+          model = 'claude-3-5-sonnet-20240620',
+          api_key_name = 'ANTHROPIC_API_KEY',
+          system_prompt = helpful_prompt,
+          replace = false,
+        }, dingllm.make_anthropic_spec_curl_args, dingllm.handle_anthropic_spec_data)
+      end
+
+      local function anthropic_replace()
+        dingllm.invoke_llm_and_stream_into_editor({
+          url = 'https://api.anthropic.com/v1/messages',
+          model = 'claude-3-5-sonnet-20240620',
+          api_key_name = 'ANTHROPIC_API_KEY',
+          system_prompt = system_prompt,
+          replace = true,
+        }, dingllm.make_anthropic_spec_curl_args, dingllm.handle_anthropic_spec_data)
+      end
+
+      vim.keymap.set({'v' }, '<leader>k', groq_replace, { desc = 'llm groq' })
+      vim.keymap.set({'v' }, '<leader>K', groq_help, { desc = 'llm groq_help' })
+      vim.keymap.set({'v' }, '<leader>L', llama405b_help, { desc = 'llm llama405b_help' })
+      vim.keymap.set({'v' }, '<leader>l', llama405b_replace, { desc = 'llm llama405b_replace' })
+      vim.keymap.set({'v' }, '<leader>I', anthropic_help, { desc = 'llm anthropic_help' })
+      vim.keymap.set({'v' }, '<leader>i', anthropic_replace, { desc = 'llm anthropic' })
+      vim.keymap.set({'v' }, '<leader>o', llama_405b_base, { desc = 'llama base' })
+    end,
+  },
 	{
 		"L3MON4D3/LuaSnip",
 		-- follow latest release.
 		version = "v2.*", -- Replace <CurrentMajor> by the latest released major (first number of latest release)
 		-- install jsregexp (optional!).
-		build = "make install_jsregexp",
+		-- build = "make install_jsregexp",
 	},
 	{
 		"stevearc/overseer.nvim",
@@ -171,23 +293,50 @@ require("lazy").setup({
 		},
 	},
 
-	{
-		"nvim-orgmode/orgmode",
-		dependencies = {
-			{ "nvim-treesitter/nvim-treesitter", lazy = true },
-		},
-		event = "VeryLazy",
-		config = function()
-			-- Setup treesitter
-			require("nvim-treesitter.configs").setup({
-				highlight = {
-					enable = true,
-					additional_vim_regex_highlighting = { "org" },
-				},
-				ensure_installed = { "org" },
-			})
-		end,
-	},
+{
+  'nvim-orgmode/orgmode',
+  dependencies = {
+    { 'nvim-treesitter/nvim-treesitter', lazy = true },
+  },
+  event = 'VeryLazy',
+  config = function()
+    -- Load treesitter grammar for org
+    -- require('orgmode').setup_ts_grammar()
+
+    -- Setup treesitter
+    -- require('nvim-treesitter.configs').setup({
+    --   highlight = {
+    --     enable = true,
+    --     additional_vim_regex_highlighting = { 'org' },
+    --   },
+    --   ensure_installed = { 'org' },
+    -- })
+
+    -- Setup orgmode
+    require('orgmode').setup({
+      org_agenda_files = '~/org/**/*',
+      org_default_notes_file = '~/org/refile.org',
+    })
+  end,
+},
+
+	-- {
+	-- 	"nvim-orgmode/orgmode",
+	-- 	dependencies = {
+	-- 		{ "nvim-treesitter/nvim-treesitter", lazy = true },
+	-- 	},
+	-- 	event = "VeryLazy",
+	-- 	config = function()
+	-- 		-- Setup treesitter
+	-- 		require("nvim-treesitter.configs").setup({
+	-- 			highlight = {
+	-- 				enable = true,
+	-- 				additional_vim_regex_highlighting = { "org" },
+	-- 			},
+	-- 			ensure_installed = { "org" },
+	-- 		})
+	-- 	end,
+	-- },
 })
 
 -- Lanaguage Server Protocol (LSP) configuration.
@@ -231,14 +380,10 @@ require("mason").setup({
 })
 require("mason-lspconfig").setup({
 	ensure_installed = {
-		"rust_analyzer",
 		"clangd",
-		"mesonlsp",
 		"gopls",
 		"lua_ls",
 		"pylsp",
-		"taplo",
-		"lemminx",
 		"terraformls",
 	},
 	handlers = {
@@ -544,7 +689,7 @@ vim.api.nvim_create_autocmd("LspAttach", {
 			print(vim.inspect(vim.lsp.buf.list_workspace_folders()))
 		end, opts)
 		vim.keymap.set("n", "<space>D", vim.lsp.buf.type_definition, opts)
-		vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
+		-- vim.keymap.set("n", "<space>rn", vim.lsp.buf.rename, opts)
 		vim.keymap.set({ "n", "v" }, "<space>ca", vim.lsp.buf.code_action, opts)
 		vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
 		vim.keymap.set("n", "<space>f", function()
@@ -634,4 +779,44 @@ vim.api.nvim_set_keymap("n", "<leader>go", ":Telescope vim_bookmarks all<CR>", {
 vim.api.nvim_set_keymap("n", "<leader>t", ":SendHere<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>gs", ":Neogit<CR>", { noremap = true, silent = true })
 
--- vim.api.nvim_set_keymap("n", "<leader>d", ":<CR>", { noremap = true, silent = true })
+function DeleteBuffersMatchingPattern()
+    local pattern = vim.fn.input('Enter regex pattern: ')
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        local bufname = vim.api.nvim_buf_get_name(bufnr)
+        if string.match(bufname, pattern) then
+            vim.api.nvim_buf_delete(bufnr, { force = true })
+        end
+    end
+end
+vim.api.nvim_set_keymap('n', '<leader>db', [[:lua DeleteBuffersMatchingPattern()<CR>]], { noremap = true, silent = true })
+
+vim.api.nvim_create_autocmd("VimResized", {
+  pattern = "*",
+  command = "wincmd ="
+})
+
+
+vim.opt.termguicolors = true
+
+vim.cmd([[set background=dark]])
+
+vim.api.nvim_set_hl(0, "Normal", { bg = "#000000", fg = "#00FF00" })
+vim.api.nvim_set_hl(0, "NormalFloat", { bg = "#000000", fg = "#00FF00" })
+
+
+vim.api.nvim_set_keymap('v', '<leader>m', [[:lua SetMakePrgFromVisualSelection()<CR>]], { noremap = true, silent = true })
+
+function SetMakePrgFromVisualSelection()
+    -- Use vim.cmd to enter normal mode to get visual selection
+    vim.cmd('normal! `<v`>y') -- Yank visually selected text into register
+    local selected_text = vim.fn.getreg('"') -- Get the yanked text from unnamed register
+
+    -- Escape spaces in the selected text
+    local escaped_text = selected_text:gsub(" ", "\\ ")
+
+    -- Use vim.cmd to set the makeprg
+    vim.cmd('set makeprg=' .. escaped_text)
+
+    -- Print confirmation
+    print("makeprg set to: " .. escaped_text)
+end

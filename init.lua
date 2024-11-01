@@ -47,7 +47,7 @@ function pipe_messages_to_buffer()
 end
 
 -- Create a keybinding to call the function
-vim.api.nvim_set_keymap("n", "<leader>o", ":lua pipe_messages_to_buffer()<CR>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<leader>O", ":lua pipe_messages_to_buffer()<CR>", { noremap = true, silent = true })
 
 -- A modern plugin manager for Neovim.
 require("lazy").setup({
@@ -315,7 +315,7 @@ require("lazy").setup({
     -- Setup orgmode
     require('orgmode').setup({
       org_agenda_files = '~/org/**/*',
-      org_default_notes_file = '~/org/refile.org',
+      org_default_notes_file = '~/org/todo.org',
     })
   end,
 },
@@ -820,3 +820,6 @@ function SetMakePrgFromVisualSelection()
     -- Print confirmation
     print("makeprg set to: " .. escaped_text)
 end
+
+
+

@@ -415,7 +415,7 @@ cmp.setup({
 })
 
 lsp_zero.setup_servers({
-	"tsserver",
+	"ts_ls",
 	"rust_analyzer",
 	"clangd",
 	"mesonlsp",

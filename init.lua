@@ -765,6 +765,7 @@ vim.api.nvim_set_keymap("n", "<leader>fl", ":Telescope lsp_document_symbols<CR>"
 vim.api.nvim_set_keymap("n", "<leader>fo", ":Telescope oldfiles<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>fg", ":Telescope git_files<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>ff", ":Telescope find_files<CR>", { noremap = true, silent = true })
+vim.api.nvim_set_keymap("n", "<leader>fz", ":FZF<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>fc", ":Rg<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>b", ":Telescope buffers<CR>", { noremap = true, silent = true })
 vim.api.nvim_set_keymap("n", "<leader>gf", ":Telescope live_grep<CR>", { noremap = true, silent = true })
